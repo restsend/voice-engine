@@ -21,6 +21,11 @@ fn dot_product_128(w: &[f32], x: &[f32]) -> f32 {
         }
     }
 
+    #[cfg(target_arch = "aarch64")]
+    {
+        return unsafe { super::simd::dot_product_neon(w, x) };
+    }
+
     let mut sum = 0.0;
     // Unroll 8 times for better pipelining
     for k in 0..16 {
@@ -46,6 +51,11 @@ fn dot_product_256(w: &[f32], x: &[f32]) -> f32 {
         } else if is_x86_feature_detected!("avx") {
             return unsafe { super::simd::dot_product_avx(w, x) };
         }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        return unsafe { super::simd::dot_product_neon(w, x) };
     }
 
     let mut sum = 0.0;
