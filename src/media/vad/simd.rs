@@ -170,5 +170,6 @@ pub fn dot_product(w: &[f32], x: &[f32]) -> f32 {
         return unsafe { dot_product_neon(w, x) };
     }
 
+    #[allow(unreachable_code)]
     w.iter().zip(x.iter()).map(|(a, b)| a * b).sum()
 }

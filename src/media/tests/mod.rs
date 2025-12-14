@@ -2,6 +2,7 @@ mod denoiser;
 mod file_track;
 mod jitter;
 mod media_pass;
+mod perf_analysis;
 mod recorder;
 mod rtp_track;
 mod stream;

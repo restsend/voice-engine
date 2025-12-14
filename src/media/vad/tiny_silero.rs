@@ -26,6 +26,7 @@ fn dot_product_128(w: &[f32], x: &[f32]) -> f32 {
         return unsafe { super::simd::dot_product_neon(w, x) };
     }
 
+    #[allow(unreachable_code)]
     let mut sum = 0.0;
     // Unroll 8 times for better pipelining
     for k in 0..16 {
@@ -57,7 +58,7 @@ fn dot_product_256(w: &[f32], x: &[f32]) -> f32 {
     {
         return unsafe { super::simd::dot_product_neon(w, x) };
     }
-
+    #[allow(unreachable_code)]
     let mut sum = 0.0;
     // Unroll 8 times
     for k in 0..32 {
@@ -118,22 +119,6 @@ impl Conv1dLayer {
         self.bias = Some(b);
     }
 
-    // Forward pass
-    // Input: [in_channels, input_len] (flattened)
-    // Output: [out_channels, output_len] (flattened)
-    // We assume input is column-major or row-major?
-    // Usually [batch, channels, time]. Here batch=1.
-    // So [channels, time].
-    // Let's use [time, channels] for easier iteration?
-    // No, Conv1d usually works on [channels, time].
-    // But for cache locality, [time, channels] might be better if we iterate time.
-    // However, the weights are [out, in, k].
-    // Let's stick to [channels, time] to match standard logic, or [time, channels] if it simplifies.
-    // The STFT output is [3, 129] (Time, Channels).
-    // The Encoder expects [Batch, Channels, Time].
-    // So [129, 3].
-    // Let's use [channels, time] internally.
-
     fn forward(&self, input: &[f32], input_len: usize, output: &mut [f32]) {
         if self.weights.is_empty() {
             panic!(
@@ -188,17 +173,6 @@ impl Conv1dLayer {
                     output[out_idx_base + t] += sum;
                 }
             }
-            // ReLU is not needed for STFT usually?
-            // Wait, Silero STFT is just a Conv1d, does it have ReLU?
-            // The ONNX graph showed it's just Conv.
-            // But my generic forward applies ReLU.
-            // Let's check if STFT output should be ReLU'd.
-            // Usually STFT is linear.
-            // The ONNX graph inspection didn't show ReLU after STFT Conv.
-            // It goes to Magnitude computation.
-            // If I apply ReLU, I kill negative values, which ruins STFT.
-            // FIX: Do NOT apply ReLU for STFT.
-            // How to distinguish? STFT is the only one with kernel > 16 here.
             return;
         }
 
