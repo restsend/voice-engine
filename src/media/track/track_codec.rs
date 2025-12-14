@@ -13,7 +13,6 @@ use crate::{
 };
 use std::cell::RefCell;
 
-#[cfg(feature = "g729")]
 use crate::media::codecs::g729::{G729Decoder, G729Encoder};
 #[cfg(feature = "opus")]
 use crate::media::codecs::opus::{OpusDecoder, OpusEncoder};
@@ -27,9 +26,7 @@ pub struct TrackCodec {
     pub g722_encoder: RefCell<G722Encoder>,
     pub g722_decoder: RefCell<G722Decoder>,
 
-    #[cfg(feature = "g729")]
     pub g729_encoder: RefCell<G729Encoder>,
-    #[cfg(feature = "g729")]
     pub g729_decoder: RefCell<G729Decoder>,
 
     #[cfg(feature = "opus")]
@@ -57,9 +54,7 @@ impl TrackCodec {
             pcma_decoder: RefCell::new(PcmaDecoder::new()),
             g722_encoder: RefCell::new(G722Encoder::new()),
             g722_decoder: RefCell::new(G722Decoder::new()),
-            #[cfg(feature = "g729")]
             g729_encoder: RefCell::new(G729Encoder::new()),
-            #[cfg(feature = "g729")]
             g729_decoder: RefCell::new(G729Decoder::new()),
             #[cfg(feature = "opus")]
             opus_encoder: RefCell::new(None),
@@ -71,9 +66,7 @@ impl TrackCodec {
 
     pub fn is_audio(payload_type: u8) -> bool {
         match payload_type {
-            0 | 8 | 9 => true,
-            #[cfg(feature = "g729")]
-            18 => true,
+            0 | 8 | 9 | 18 => true,
             #[cfg(feature = "opus")]
             111 => true,
             _ => false,
@@ -85,7 +78,6 @@ impl TrackCodec {
             0 => self.pcmu_decoder.borrow_mut().decode(payload),
             8 => self.pcma_decoder.borrow_mut().decode(payload),
             9 => self.g722_decoder.borrow_mut().decode(payload),
-            #[cfg(feature = "g729")]
             18 => self.g729_decoder.borrow_mut().decode(payload),
             #[cfg(feature = "opus")]
             111 => {
@@ -155,7 +147,6 @@ impl TrackCodec {
                     0 => self.pcmu_encoder.borrow_mut().encode(&pcm),
                     8 => self.pcma_encoder.borrow_mut().encode(&pcm),
                     9 => self.g722_encoder.borrow_mut().encode(&pcm),
-                    #[cfg(feature = "g729")]
                     18 => self.g729_encoder.borrow_mut().encode(&pcm),
                     #[cfg(feature = "opus")]
                     111 => {

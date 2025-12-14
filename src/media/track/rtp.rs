@@ -239,7 +239,6 @@ impl RtpTrackBuilder {
             enabled_codecs: vec![
                 #[cfg(feature = "opus")]
                 CodecType::Opus,
-                #[cfg(feature = "g729")]
                 CodecType::G729,
                 CodecType::G722,
                 CodecType::PCMU,

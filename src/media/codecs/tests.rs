@@ -182,7 +182,6 @@ fn test_codec_factory() {
     assert_eq!(decoder.sample_rate(), 16000);
     assert_eq!(decoder.channels(), 1);
 
-    #[cfg(feature = "g729")]
     {
         let decoder = create_decoder(CodecType::G729);
         assert_eq!(decoder.sample_rate(), 8000);
@@ -202,7 +201,6 @@ fn test_codec_factory() {
     assert_eq!(encoder.sample_rate(), 16000);
     assert_eq!(encoder.channels(), 1);
 
-    #[cfg(feature = "g729")]
     {
         let encoder = create_encoder(CodecType::G729);
         assert_eq!(encoder.sample_rate(), 8000);
@@ -324,7 +322,6 @@ fn test_codec_encode_decode() {
     }
 }
 
-#[cfg(feature = "g729")]
 #[test]
 fn test_g729_encode_decode() {
     // Use a simple synthetic signal instead of real audio to avoid overflow
@@ -378,7 +375,6 @@ fn test_parse_rtpmap() {
         (9, CodecType::G722, 8000, 1),
         parse_rtpmap("9 G722/8000").unwrap()
     );
-    #[cfg(feature = "g729")]
     assert_eq!(
         (18, CodecType::G729, 8000, 1),
         parse_rtpmap("18 G729/8000").unwrap()

@@ -1,6 +1,6 @@
 [package]
 name = "voice-engine"
-version = "0.3.20"
+version = "0.3.21"
 edition = "2024"
 authors = ["jinti<shenjindi@fourz.cn>"]
 description = "A voip voice processing engine in Rust"
@@ -12,8 +12,7 @@ categories = ["multimedia"]
 
 [features]
 opus = ["dep:opusic-sys"]
-g729 = ["dep:g729-sys"]
-default = ["opus", "g729"]
+default = ["opus"]
 not_vad = []
 
 [lib]
@@ -23,7 +22,7 @@ crate-type = ["rlib"]
 anyhow = "1.0.100"
 async-trait = "0.1.88"
 async-stream = "0.3.6"
-g729-sys = { version = "0.1.2", optional = true }
+g729-sys = "0.1.2"
 opusic-sys = { version = "0.5.8", optional = true }
 ndarray = "0.16.1"
 webrtc = "0.14.0"

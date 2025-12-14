@@ -1,6 +1,5 @@
 use crate::media::{PcmBuf, Sample};
 pub mod g722;
-#[cfg(feature = "g729")]
 pub mod g729;
 #[cfg(feature = "opus")]
 pub mod opus;
@@ -15,7 +14,6 @@ pub enum CodecType {
     PCMU,
     PCMA,
     G722,
-    #[cfg(feature = "g729")]
     G729,
     #[cfg(feature = "opus")]
     Opus,
@@ -49,7 +47,6 @@ pub fn create_decoder(codec: CodecType) -> Box<dyn Decoder> {
         CodecType::PCMU => Box::new(pcmu::PcmuDecoder::new()),
         CodecType::PCMA => Box::new(pcma::PcmaDecoder::new()),
         CodecType::G722 => Box::new(g722::G722Decoder::new()),
-        #[cfg(feature = "g729")]
         CodecType::G729 => Box::new(g729::G729Decoder::new()),
         #[cfg(feature = "opus")]
         CodecType::Opus => Box::new(opus::OpusDecoder::new_default()),
@@ -62,7 +59,6 @@ pub fn create_encoder(codec: CodecType) -> Box<dyn Encoder> {
         CodecType::PCMU => Box::new(pcmu::PcmuEncoder::new()),
         CodecType::PCMA => Box::new(pcma::PcmaEncoder::new()),
         CodecType::G722 => Box::new(g722::G722Encoder::new()),
-        #[cfg(feature = "g729")]
         CodecType::G729 => Box::new(g729::G729Encoder::new()),
         #[cfg(feature = "opus")]
         CodecType::Opus => Box::new(opus::OpusEncoder::new_default()),
@@ -76,7 +72,6 @@ impl CodecType {
             CodecType::PCMU => "audio/PCMU",
             CodecType::PCMA => "audio/PCMA",
             CodecType::G722 => "audio/G722",
-            #[cfg(feature = "g729")]
             CodecType::G729 => "audio/G729",
             #[cfg(feature = "opus")]
             CodecType::Opus => "audio/opus",
@@ -88,7 +83,6 @@ impl CodecType {
             CodecType::PCMU => "PCMU/8000",
             CodecType::PCMA => "PCMA/8000",
             CodecType::G722 => "G722/8000",
-            #[cfg(feature = "g729")]
             CodecType::G729 => "G729/8000",
             #[cfg(feature = "opus")]
             CodecType::Opus => "opus/48000/2",
@@ -100,7 +94,6 @@ impl CodecType {
             CodecType::PCMU => None,
             CodecType::PCMA => None,
             CodecType::G722 => None,
-            #[cfg(feature = "g729")]
             CodecType::G729 => None,
             #[cfg(feature = "opus")]
             CodecType::Opus => Some("minptime=10;useinbandfec=1"),
@@ -113,7 +106,6 @@ impl CodecType {
             CodecType::PCMU => 8000,
             CodecType::PCMA => 8000,
             CodecType::G722 => 8000,
-            #[cfg(feature = "g729")]
             CodecType::G729 => 8000,
             #[cfg(feature = "opus")]
             CodecType::Opus => 48000,
@@ -134,7 +126,6 @@ impl CodecType {
             CodecType::PCMU => 0,
             CodecType::PCMA => 8,
             CodecType::G722 => 9,
-            #[cfg(feature = "g729")]
             CodecType::G729 => 18,
             #[cfg(feature = "opus")]
             CodecType::Opus => 111,
@@ -146,7 +137,6 @@ impl CodecType {
             CodecType::PCMU => 8000,
             CodecType::PCMA => 8000,
             CodecType::G722 => 16000,
-            #[cfg(feature = "g729")]
             CodecType::G729 => 8000,
             #[cfg(feature = "opus")]
             CodecType::Opus => 48000,
@@ -156,7 +146,6 @@ impl CodecType {
     pub fn is_audio(&self) -> bool {
         match self {
             CodecType::PCMU | CodecType::PCMA | CodecType::G722 => true,
-            #[cfg(feature = "g729")]
             CodecType::G729 => true,
             #[cfg(feature = "opus")]
             CodecType::Opus => true,
@@ -182,7 +171,6 @@ impl TryFrom<u8> for CodecType {
             0 => Ok(CodecType::PCMU),
             8 => Ok(CodecType::PCMA),
             9 => Ok(CodecType::G722),
-            #[cfg(feature = "g729")]
             18 => Ok(CodecType::G729), // Static payload type
             // Dynamic payload type shoulw get from the rtpmap in sdp offer, leave this for backward compatibility
             101 => Ok(CodecType::TelephoneEvent),
@@ -223,7 +211,6 @@ pub fn parse_rtpmap(rtpmap: &str) -> Result<(u8, CodecType, u32, u16), anyhow::E
                 "pcmu" => CodecType::PCMU,
                 "pcma" => CodecType::PCMA,
                 "g722" => CodecType::G722,
-                #[cfg(feature = "g729")]
                 "g729" => CodecType::G729,
                 #[cfg(feature = "opus")]
                 "opus" => CodecType::Opus,
