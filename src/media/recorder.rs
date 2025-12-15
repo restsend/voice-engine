@@ -1,3 +1,4 @@
+use crate::media::codecs::{Decoder, g729::G729Decoder};
 use crate::media::{AudioFrame, PcmBuf, Samples, codecs::samples_to_bytes};
 use anyhow::{Result, anyhow};
 use futures::StreamExt;
@@ -359,6 +360,25 @@ impl Default for RecorderOption {
     }
 }
 
+pub struct G729WavReader {
+    decoder: G729Decoder,
+    file_path: PathBuf,
+}
+
+impl G729WavReader {
+    pub fn new(path: PathBuf) -> Self {
+        Self {
+            decoder: G729Decoder::new(),
+            file_path: path,
+        }
+    }
+
+    pub async fn read_all(&mut self) -> Result<Vec<i16>> {
+        let data = tokio::fs::read(&self.file_path).await?;
+        Ok(self.decoder.decode(&data))
+    }
+}
+
 pub struct Recorder {
     session_id: String,
     option: RecorderOption,
@@ -444,8 +464,20 @@ impl Recorder {
     pub async fn process_recording(
         &self,
         file_path: &Path,
-        receiver: UnboundedReceiver<AudioFrame>,
+        mut receiver: UnboundedReceiver<AudioFrame>,
     ) -> Result<()> {
+        // Peek first frame to decide mode
+        let first_frame = match receiver.recv().await {
+            Some(f) => f,
+            None => return Ok(()),
+        };
+
+        if let Samples::RTP { .. } = first_frame.samples {
+            return self
+                .process_recording_rtp(file_path, receiver, first_frame)
+                .await;
+        }
+
         let requested_format = self.option.format.unwrap_or(RecorderFormat::Wav);
         let effective_format = requested_format.effective();
 
@@ -460,7 +492,9 @@ impl Recorder {
         if effective_format == RecorderFormat::Ogg {
             #[cfg(feature = "opus")]
             {
-                return self.process_recording_ogg(file_path, receiver).await;
+                return self
+                    .process_recording_ogg(file_path, receiver, first_frame)
+                    .await;
             }
             #[cfg(not(feature = "opus"))]
             {
@@ -470,7 +504,8 @@ impl Recorder {
             }
         }
 
-        self.process_recording_wav(file_path, receiver).await
+        self.process_recording_wav(file_path, receiver, first_frame)
+            .await
     }
 
     fn ensure_parent_dir(&self, file_path: &Path) -> Result<()> {
@@ -511,13 +546,138 @@ impl Recorder {
         }
     }
 
+    async fn update_wav_header_rtp(&self, file: &mut File, payload_type: u8) -> Result<()> {
+        let total_bytes = self.samples_written.load(Ordering::SeqCst);
+        let data_size = total_bytes;
+
+        let (format_tag, sample_rate, channels): (u16, u32, u16) = match payload_type {
+            0 => (0x0007, 8000, 1),  // PCMU
+            8 => (0x0006, 8000, 1),  // PCMA
+            9 => (0x0064, 16000, 1), // G722
+            _ => return Ok(()),      // Should not happen for WAV
+        };
+
+        let mut header_buf = Vec::new();
+        header_buf.extend_from_slice(b"RIFF");
+        let file_size = data_size + 36;
+        header_buf.extend_from_slice(&(file_size as u32).to_le_bytes());
+        header_buf.extend_from_slice(b"WAVE");
+
+        header_buf.extend_from_slice(b"fmt ");
+        header_buf.extend_from_slice(&16u32.to_le_bytes());
+        header_buf.extend_from_slice(&format_tag.to_le_bytes());
+        header_buf.extend_from_slice(&(channels as u16).to_le_bytes());
+        header_buf.extend_from_slice(&sample_rate.to_le_bytes());
+
+        // Byte rate
+        let bytes_per_sec: u32 = match payload_type {
+            9 => 8000,                                // G.722 is 64kbps
+            _ => sample_rate * (channels as u32) * 1, // G.711 is 8-bit
+        };
+        header_buf.extend_from_slice(&bytes_per_sec.to_le_bytes());
+
+        // Block align
+        let block_align: u16 = match payload_type {
+            9 => 1,
+            _ => 1,
+        };
+        header_buf.extend_from_slice(&block_align.to_le_bytes());
+
+        // Bits per sample
+        let bits_per_sample: u16 = match payload_type {
+            9 => 4,
+            _ => 8,
+        };
+        header_buf.extend_from_slice(&bits_per_sample.to_le_bytes());
+
+        header_buf.extend_from_slice(b"data");
+        header_buf.extend_from_slice(&(data_size as u32).to_le_bytes());
+
+        file.seek(std::io::SeekFrom::Start(0)).await?;
+        file.write_all(&header_buf).await?;
+        file.seek(std::io::SeekFrom::End(0)).await?;
+
+        Ok(())
+    }
+
+    async fn process_recording_rtp(
+        &self,
+        file_path: &Path,
+        mut receiver: UnboundedReceiver<AudioFrame>,
+        first_frame: AudioFrame,
+    ) -> Result<()> {
+        let (payload_type, mut file) =
+            if let Samples::RTP { payload_type, .. } = &first_frame.samples {
+                let mut path = file_path.to_path_buf();
+                // Adjust extension if needed
+                if *payload_type == 18 {
+                    path.set_extension("g729");
+                } else if matches!(payload_type, 0 | 8 | 9) {
+                    path.set_extension("wav");
+                }
+
+                let file = self.create_output_file(&path).await?;
+                (*payload_type, file)
+            } else {
+                return Err(anyhow!("Invalid frame type for RTP recording"));
+            };
+
+        // Write header if needed
+        match payload_type {
+            0 | 8 | 9 => {
+                self.write_wav_header_rtp(&mut file, payload_type).await?;
+            }
+            _ => {}
+        }
+
+        if let Samples::RTP { payload, .. } = first_frame.samples {
+            file.write_all(&payload).await?;
+            self.samples_written
+                .fetch_add(payload.len(), Ordering::SeqCst);
+        }
+
+        loop {
+            match receiver.recv().await {
+                Some(frame) => {
+                    if let Samples::RTP { payload, .. } = frame.samples {
+                        file.write_all(&payload).await?;
+                        self.samples_written
+                            .fetch_add(payload.len(), Ordering::SeqCst);
+                    }
+                }
+                None => break,
+            }
+        }
+
+        // Finalize
+        match payload_type {
+            0 | 8 | 9 => {
+                self.update_wav_header_rtp(&mut file, payload_type).await?;
+            }
+            _ => {}
+        }
+
+        file.sync_all().await?;
+
+        Ok(())
+    }
+
+    // Helper for initial header write (just placeholders)
+    async fn write_wav_header_rtp(&self, file: &mut File, payload_type: u8) -> Result<()> {
+        self.update_wav_header_rtp(file, payload_type).await
+    }
+
     async fn process_recording_wav(
         &self,
         file_path: &Path,
         mut receiver: UnboundedReceiver<AudioFrame>,
+        first_frame: AudioFrame,
     ) -> Result<()> {
         let mut file = self.create_output_file(file_path).await?;
         self.update_wav_header(&mut file).await?;
+
+        self.append_frame(first_frame).await.ok();
+
         let chunk_size = (self.option.samplerate / 1000 * self.option.ptime) as usize;
         info!(
             session_id = self.session_id,
@@ -555,6 +715,7 @@ impl Recorder {
         &self,
         file_path: &Path,
         mut receiver: UnboundedReceiver<AudioFrame>,
+        first_frame: AudioFrame,
     ) -> Result<()> {
         let mut file = self.create_output_file(file_path).await?;
         let mut writer = OggStreamWriter::new(self.option.samplerate)?;
@@ -567,6 +728,8 @@ impl Recorder {
             );
         }
         writer.write_headers(&mut file).await?;
+
+        self.append_frame(first_frame).await.ok();
 
         let chunk_size = (self.option.samplerate / 1000 * self.option.ptime) as usize;
         info!(
