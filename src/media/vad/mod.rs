@@ -9,9 +9,11 @@ use std::cell::RefCell;
 use tokio_util::sync::CancellationToken;
 
 pub(crate) mod simd;
-pub(crate) mod tiny_silero;
-pub(crate) mod tiny_ten;
+pub mod tiny_silero;
+pub mod tiny_ten;
 pub(crate) mod utils;
+pub use tiny_silero::TinySilero;
+pub use tiny_ten::TinyTen;
 
 #[cfg(test)]
 mod benchmark_all;
@@ -245,7 +247,7 @@ impl VadProcessor {
     ) -> Result<Box<dyn Processor>> {
         let vad: Box<dyn VadEngine> = match option.r#type {
             VadType::Silero => Box::new(tiny_silero::TinySilero::new(option.clone())?),
-            VadType::Ten => Box::new(tiny_ten::TinyVad::new(option.clone())?),
+            VadType::Ten => Box::new(tiny_ten::TinyTen::new(option.clone())?),
             _ => Box::new(NopVad::new()?),
         };
         Ok(Box::new(VadProcessor::new(vad, event_sender, option)?))

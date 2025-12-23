@@ -877,7 +877,7 @@ impl LstmLayer {
     }
 }
 
-pub struct TinyVad {
+pub struct TinyTen {
     config: VADOption,
     buffer: PcmBuf,
     last_timestamp: u64,
@@ -929,7 +929,7 @@ pub struct TinyVad {
 
 const WEIGHTS_BYTES: &[u8] = include_bytes!("tiny_tenvad.bin");
 
-impl TinyVad {
+impl TinyTen {
     pub fn new(config: VADOption) -> Result<Self> {
         if config.samplerate != 16000 {
             return Err(anyhow::anyhow!("TinyVad only supports 16kHz audio"));
@@ -1234,7 +1234,7 @@ impl TinyVad {
     }
 }
 
-impl VadEngine for TinyVad {
+impl VadEngine for TinyTen {
     fn process(&mut self, frame: &mut AudioFrame) -> Option<(bool, u64)> {
         let samples = match &frame.samples {
             Samples::PCM { samples } => samples,

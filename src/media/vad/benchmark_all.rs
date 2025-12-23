@@ -2,7 +2,7 @@
 mod tests {
     use crate::media::vad::VADOption;
     use crate::media::vad::tiny_silero::TinySilero;
-    use crate::media::vad::tiny_ten::TinyVad;
+    use crate::media::vad::tiny_ten::TinyTen;
     use std::time::Instant;
 
     #[test]
@@ -48,7 +48,7 @@ mod tests {
         );
 
         // 6. Tiny Ten (F32)
-        let mut ten_tiny = TinyVad::new(config.clone()).expect("Failed to create TinyVad");
+        let mut ten_tiny = TinyTen::new(config.clone()).expect("Failed to create TinyVad");
         let start = Instant::now();
         let mut count = 0;
         // TinyVad usually consumes chunks of specific size, let's use 512 (32ms) as input
