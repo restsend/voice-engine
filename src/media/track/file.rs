@@ -521,6 +521,12 @@ impl Track for FileTrack {
                 path.split('.').last().unwrap_or("").to_string()
             };
 
+            let cache_key = if path.starts_with("http://") || path.starts_with("https://") {
+                Some(cache::generate_cache_key(&path, 0, None, None))
+            } else {
+                None
+            };
+
             // Open file or download from URL
             let file = if path.starts_with("http://") || path.starts_with("https://") {
                 download_from_url(&path, use_cache).await
@@ -532,6 +538,11 @@ impl Track for FileTrack {
                 Ok(file) => file,
                 Err(e) => {
                     warn!("filetrack: Error opening file: {}", e);
+                    if let Some(key) = cache_key {
+                        if use_cache {
+                            let _ = cache::delete_from_cache(&key).await;
+                        }
+                    }
                     event_sender
                         .send(SessionEvent::Error {
                             track_id: id.clone(),
@@ -570,6 +581,11 @@ impl Track for FileTrack {
             // Handle any streaming errors
             if let Err(e) = stream_result {
                 warn!("filetrack: Error streaming audio: {}, {}", path, e);
+                if let Some(key) = cache_key {
+                    if use_cache {
+                        let _ = cache::delete_from_cache(&key).await;
+                    }
+                }
                 event_sender
                     .send(SessionEvent::Error {
                         track_id: id.clone(),
