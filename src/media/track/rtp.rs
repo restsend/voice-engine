@@ -28,7 +28,7 @@ use std::{
 };
 use tokio::{select, time::Instant, time::interval_at};
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, info, warn};
+use tracing::{debug, info, trace, warn};
 use webrtc::{
     rtcp::{
         goodbye::Goodbye,
@@ -1029,8 +1029,8 @@ impl RtpTrack {
                     };
 
                     if let Err(e) = processor_chain.process_frame(&mut frame) {
-                        warn!(track_id, "Failed to process frame: {}", e);
-                        break;
+                        trace!(track_id, "Failed to process frame: {}", e);
+                        continue;
                     }
                     match packet_sender.send(frame) {
                         Ok(_) => {}
